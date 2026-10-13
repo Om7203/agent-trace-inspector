@@ -49,6 +49,8 @@ The evaluator currently performs deterministic structural checks. Evidence-path 
 ## API
 
 - `GET /api/health` — process and fixture status
+- `GET /api/health/live` — liveness probe
+- `GET /api/health/ready` — readiness probe
 - `GET /api/traces` — traces plus their evaluation
 - `GET /api/summary` — evaluation report
 - `POST /api/evaluate` — evaluate one trace, limited to 200 KB
@@ -70,3 +72,9 @@ The evaluator currently performs deterministic structural checks. Evidence-path 
 5. Publish a static portfolio case study with versioned evaluation results.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the data flow and design decisions.
+
+## Delivery and operating status
+
+GitHub Actions verifies Node.js 20 and 22, checks the generated report for drift, audits dependencies, builds the container, and runs CodeQL. Semantic-version tags publish an SBOM- and provenance-attested image to GitHub Container Registry.
+
+This is a **release-ready learning project**, not a production service. [`docs/OPERATIONS.md`](docs/OPERATIONS.md) lists the release checks, rollback approach, and work still required before making a production-readiness claim. Security assumptions and limitations are documented in [`SECURITY.md`](SECURITY.md).
