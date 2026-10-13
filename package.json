@@ -1,0 +1,16 @@
+{
+  "name": "agent-trace-inspector",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Model-independent evaluation and debugging for AI-agent tool traces.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test",
+    "evaluate": "node src/report.mjs",
+    "check": "node --check src/evaluator.mjs && node --check src/server.mjs && node --check public/app.js && npm test && npm run evaluate"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
