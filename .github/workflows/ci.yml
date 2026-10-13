@@ -10,11 +10,36 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node-version }}
           cache: npm
-      - run: npm install --ignore-scripts
+      - run: npm ci --ignore-scripts
       - run: npm run check
+      - name: Verify generated evaluation is committed
+        run: git diff --exit-code -- docs/evaluation.json
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
+      - uses: actions/upload-artifact@v4
+        if: matrix.node-version == 22
+        with:
+          name: evaluation-report
+          path: docs/evaluation.json
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: agent-trace-inspector:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
