@@ -54,3 +54,30 @@ jobs:
         uses: azure/CLI@v2
         with:
           inlineScript: az bicep build --file infra/main.bicep --stdout > /dev/null
+
+  operability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Run smoke and load checks
+        run: |
+          node src/server.mjs > server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          for attempt in {1..10}; do
+            if curl --fail --silent http://127.0.0.1:3100/api/health/ready > /dev/null; then
+              break
+            fi
+            if [[ "$attempt" == "10" ]]; then
+              cat server.log
+              exit 1
+            fi
+            sleep 1
+          done
+          npm run smoke -- http://127.0.0.1:3100
+          npm run load:test -- http://127.0.0.1:3100

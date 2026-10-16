@@ -104,6 +104,11 @@ jobs:
           echo "Deployment did not become ready within two minutes." >&2
           exit 1
 
+      - name: Run deployed smoke checks
+        env:
+          TARGET_URL: ${{ steps.deploy.outputs.application_url }}
+        run: node scripts/smoke-check.mjs "$TARGET_URL"
+
       - name: Publish deployment URL
         env:
           APPLICATION_URL: ${{ steps.deploy.outputs.application_url }}

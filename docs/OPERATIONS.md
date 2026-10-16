@@ -8,6 +8,16 @@
 
 The current service does not persist user data. A restart reloads the versioned fixtures from the container image.
 
+Application logs are emitted as single-line JSON and include the deployment environment, immutable release reference, request ID, method, path, status, and duration. Query the Container Apps console logs through the deployment's Log Analytics workspace and use request IDs to correlate failures.
+
+## Reliability checks
+
+- `npm run smoke -- https://service.example` verifies liveness, readiness, evaluation summary, request IDs, and security headers.
+- `npm run load:test -- https://service.example` sends a controlled warm workload and fails when errors exceed 1% or p95 latency exceeds 750 ms.
+- Load settings can be changed with `LOAD_REQUESTS`, `LOAD_CONCURRENCY`, `LOAD_MAX_ERROR_RATE`, and `LOAD_MAX_P95_MS`.
+
+The default load check is a release gate, not a capacity benchmark. Record production measurements and operating events in `DEPLOYMENT_LOG.md`. Objectives and evidence requirements are defined in `SLO.md`.
+
 ## CI pipeline
 
 Every push and pull request runs:
@@ -37,6 +47,8 @@ Creating a tag is an external release action. Do it only after CI is green and t
 - [ ] `SECURITY.md` still describes the deployed boundary
 - [ ] Rollback target is identified as the previous container tag
 - [ ] Release notes describe changes and known limits
+- [ ] Staging smoke and load checks pass against the immutable release digest
+- [ ] Production monitoring and rollback records identify the deployed digest
 
 ## Rollback
 
