@@ -20,6 +20,13 @@ npm start
 
 Open `http://127.0.0.1:3100` to inspect the dashboard.
 
+Operational release checks can target a running local or remote service:
+
+```bash
+npm run smoke -- https://service.example
+npm run load:test -- https://service.example
+```
+
 With Docker:
 
 ```bash
@@ -75,6 +82,8 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the data flow and design 
 
 ## Delivery and operating status
 
-GitHub Actions verifies Node.js 20 and 22, checks the generated report for drift, audits dependencies, builds the container, and runs CodeQL. Semantic-version tags publish an SBOM- and provenance-attested image to GitHub Container Registry.
+GitHub Actions verifies Node.js 20 and 22, checks the generated report for drift, audits dependencies, builds and scans the container, compiles the Azure infrastructure, exercises smoke and load gates, and runs CodeQL. Semantic-version tags publish an SBOM- and provenance-attested image to GitHub Container Registry.
 
-This is a **release-ready learning project**, not a production service. [`docs/OPERATIONS.md`](docs/OPERATIONS.md) lists the release checks, rollback approach, and work still required before making a production-readiness claim. Security assumptions and limitations are documented in [`SECURITY.md`](SECURITY.md).
+The Azure deployment path uses Bicep, GitHub OIDC, protected staging and production environments, immutable image digests, Container Apps health probes, Log Analytics, and an external scheduled monitor.
+
+This remains a **release-ready learning project**, not a production service, until the real deployment and operating evidence exists. [`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md) is the claim gate. [`docs/OPERATIONS.md`](docs/OPERATIONS.md) covers release and rollback procedures, while [`SECURITY.md`](SECURITY.md) records security boundaries and limitations.

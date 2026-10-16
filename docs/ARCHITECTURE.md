@@ -34,6 +34,26 @@ The evaluator verifies declarations that code can check deterministically. It do
 
 The `POST /api/evaluate` endpoint accepts trace data only. It never imports code or runs the tools named in a trace. The request body is bounded to 200 KB.
 
-## Next technical milestone
+## Delivery and operating architecture
+
+```mermaid
+flowchart LR
+  A[Git commit] --> B[Tests, CodeQL, Bicep lint]
+  B --> C[Container build and Trivy scan]
+  C --> D[Attested image in GHCR]
+  D --> E[Azure staging]
+  E --> F[Smoke and load gates]
+  F --> G[Human production approval]
+  G --> H[Azure Container Apps production]
+  H --> I[Structured logs in Log Analytics]
+  J[External GitHub monitor] --> H
+  H --> K[Previous digest rollback]
+```
+
+The Bicep deployment creates isolated staging or production resources with managed HTTPS ingress, bounded scaling, health probes, and centralized logs. GitHub authenticates to Azure through short-lived OpenID Connect credentials. Production accepts only an immutable GHCR digest, and the protected GitHub environment provides the human approval boundary.
+
+The design is deployable but is not considered operationally proven until the real Azure deployment, monitoring window, and rollback exercise are recorded in `PRODUCTION_READINESS.md`.
+
+## Next evaluation milestone
 
 The next milestone is a versioned JSON Schema plus a privacy-clean exporter for Support Agent Lab. That will prove the format against a real project while keeping the evaluator itself independent of any model.
