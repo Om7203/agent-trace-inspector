@@ -38,3 +38,5 @@ For a release-related incident, stop further deployments, capture the failing re
 - Availability, error-rate, and latency results
 - Links or screenshots from Azure monitoring
 - Any incidents, exclusions, and rollback exercises
+
+The initial external observation source is the scheduled `Production monitor` GitHub workflow, which runs every 15 minutes and retains each result for 30 days. Azure request telemetry supplies the error-rate and latency evidence.

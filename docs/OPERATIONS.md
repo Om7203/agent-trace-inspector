@@ -10,6 +10,8 @@ The current service does not persist user data. A restart reloads the versioned 
 
 Application logs are emitted as single-line JSON and include the deployment environment, immutable release reference, request ID, method, path, status, and duration. Query the Container Apps console logs through the deployment's Log Analytics workspace and use request IDs to correlate failures.
 
+The `Production monitor` workflow checks the public service every 15 minutes after the repository variable `PRODUCTION_URL` is configured. Failed checks produce a failed workflow notification, and observations are retained as workflow artifacts for 30 days. Azure telemetry remains the source for request-level error and latency investigation.
+
 ## Reliability checks
 
 - `npm run smoke -- https://service.example` verifies liveness, readiness, evaluation summary, request IDs, and security headers.
