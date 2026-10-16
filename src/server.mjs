@@ -5,6 +5,7 @@ import { extname, join, normalize, sep } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { evaluateSuite, evaluateTrace } from './evaluator.mjs';
+import { createFixedWindowRateLimiter, rateLimitConfig } from './rate-limit.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const publicRoot = join(root, 'public');
@@ -32,15 +33,24 @@ function baseHeaders(requestId) {
     'x-request-id': requestId,
     'x-content-type-options': 'nosniff',
     'x-frame-options': 'DENY',
+    'cross-origin-opener-policy': 'same-origin',
+    'cross-origin-resource-policy': 'same-origin',
     'referrer-policy': 'no-referrer',
+    'strict-transport-security': 'max-age=31536000',
     'permissions-policy': 'camera=(), microphone=(), geolocation=()',
     'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
   };
 }
 
-function sendJson(response, status, value, requestId) {
-  response.writeHead(status, { ...baseHeaders(requestId), 'content-type': mime['.json'], 'cache-control': 'no-store' });
+function sendJson(response, status, value, requestId, headers = {}) {
+  response.writeHead(status, { ...baseHeaders(requestId), 'content-type': mime['.json'], 'cache-control': 'no-store', ...headers });
   response.end(JSON.stringify(value));
+}
+
+function clientKey(request) {
+  const forwarded = request.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',', 1)[0].trim();
+  return request.socket?.remoteAddress || 'unknown';
 }
 
 async function readBody(request) {
@@ -75,6 +85,15 @@ export async function handleRequest(request, response, options = {}) {
   if (request.method === 'GET' && url.pathname === '/api/traces') return sendJson(response, 200, { traces, evaluation: evaluateSuite(traces) }, requestId);
   if (request.method === 'GET' && url.pathname === '/api/summary') return sendJson(response, 200, evaluateSuite(traces), requestId);
   if (request.method === 'POST' && url.pathname === '/api/evaluate') {
+    const rate = options.rateLimiter?.check(clientKey(request));
+    if (rate && !rate.allowed) {
+      return sendJson(response, 429, { error: 'Evaluation request limit exceeded.' }, requestId, {
+        'ratelimit-limit': String(rate.limit),
+        'ratelimit-remaining': String(rate.remaining),
+        'ratelimit-reset': String(Math.ceil(rate.resetAt / 1000)),
+        'retry-after': String(Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1000)))
+      });
+    }
     try {
       return sendJson(response, 200, evaluateTrace(await readBody(request)), requestId);
     } catch (error) {
@@ -87,6 +106,7 @@ export async function handleRequest(request, response, options = {}) {
 
 export function createApp(options = {}) {
   const log = options.log || console.log;
+  const rateLimiter = options.rateLimiter || createFixedWindowRateLimiter(rateLimitConfig());
   const server = createServer(async (request, response) => {
     const requestId = randomUUID();
     const startedAt = performance.now();
@@ -103,7 +123,7 @@ export function createApp(options = {}) {
     });
 
     try {
-      await handleRequest(request, response, { requestId });
+      await handleRequest(request, response, { rateLimiter, requestId });
     } catch (error) {
       structuredLog(log, 'error', 'http_request_failed', {
         requestId,

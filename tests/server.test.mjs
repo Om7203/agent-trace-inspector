@@ -77,3 +77,30 @@ test('configures bounded HTTP server timeouts', () => {
   assert.equal(server.keepAliveTimeout, 5_000);
   server.close();
 });
+
+test('returns retry metadata when evaluation requests are rate limited', async () => {
+  let status;
+  let headers;
+  let body = '';
+  const response = {
+    writeHead(value, values) { status = value; headers = values; },
+    end(value = '') { body += value; }
+  };
+  const request = {
+    method: 'POST',
+    url: '/api/evaluate',
+    headers: { host: 'localhost', 'x-forwarded-for': '192.0.2.1' },
+    socket: { remoteAddress: '127.0.0.1' }
+  };
+  const resetAt = Date.now() + 30_000;
+  const rateLimiter = {
+    check: () => ({ allowed: false, limit: 30, remaining: 0, resetAt })
+  };
+
+  await handleRequest(request, response, { rateLimiter, requestId: 'test-request' });
+  assert.equal(status, 429);
+  assert.equal(headers['ratelimit-limit'], '30');
+  assert.equal(headers['ratelimit-remaining'], '0');
+  assert.match(headers['retry-after'], /^([1-9]|[12][0-9]|30)$/);
+  assert.deepEqual(JSON.parse(body), { error: 'Evaluation request limit exceeded.' });
+});

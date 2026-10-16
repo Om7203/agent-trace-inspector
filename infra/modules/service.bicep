@@ -108,6 +108,14 @@ resource application 'Microsoft.App/containerApps@2024-03-01' = {
               value: '3100'
             }
             {
+              name: 'RATE_LIMIT_MAX_REQUESTS'
+              value: '30'
+            }
+            {
+              name: 'RATE_LIMIT_WINDOW_MS'
+              value: '60000'
+            }
+            {
               name: 'SERVICE_ENVIRONMENT'
               value: environmentName
             }
