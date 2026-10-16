@@ -27,7 +27,8 @@ Every push and pull request runs:
 3. Evaluation-report regeneration and drift detection
 4. Production dependency audit
 5. Docker image build
-6. CodeQL analysis on `main`, pull requests, and weekly
+6. High and critical container vulnerability scan
+7. CodeQL analysis on `main`, pull requests, and weekly
 
 The generated evaluation report is retained as a workflow artifact on Node.js 22.
 
