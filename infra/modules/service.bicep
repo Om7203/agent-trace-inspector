@@ -22,6 +22,9 @@ param minReplicas int
 @minValue(1)
 param maxReplicas int
 
+@description('Immutable release identifier recorded in structured service logs.')
+param serviceVersion string
+
 resource logWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: logWorkspaceName
   location: location
@@ -107,6 +110,10 @@ resource application 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'SERVICE_ENVIRONMENT'
               value: environmentName
+            }
+            {
+              name: 'SERVICE_VERSION'
+              value: serviceVersion
             }
           ]
           probes: [

@@ -49,6 +49,7 @@ module service './modules/service.bicep' = {
     managedEnvironmentName: 'cae-ati-${stageCode}-${suffix}'
     maxReplicas: maxReplicas
     minReplicas: minReplicas
+    serviceVersion: image
   }
 }
 
