@@ -1,0 +1,111 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Protected GitHub environment and Azure deployment stage
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      image:
+        description: Immutable GHCR image reference ending in @sha256:<digest>
+        required: true
+        type: string
+      location:
+        description: Azure region
+        required: true
+        default: westeurope
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require an immutable image digest
+        env:
+          IMAGE: ${{ inputs.image }}
+        run: |
+          if [[ ! "$IMAGE" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]; then
+            echo "Use an immutable GHCR image reference ending in @sha256:<64 hex characters>." >&2
+            exit 1
+          fi
+
+      - name: Sign in to Azure with GitHub OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate infrastructure
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          IMAGE: ${{ inputs.image }}
+          LOCATION: ${{ inputs.location }}
+        run: |
+          az deployment sub validate \
+            --location "$LOCATION" \
+            --template-file infra/main.bicep \
+            --parameters environmentName="$ENVIRONMENT_NAME" image="$IMAGE" location="$LOCATION"
+
+      - name: Deploy infrastructure and application
+        id: deploy
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          IMAGE: ${{ inputs.image }}
+          LOCATION: ${{ inputs.location }}
+        run: |
+          deployment_name="agent-trace-${ENVIRONMENT_NAME}-${GITHUB_RUN_ID}"
+          az deployment sub create \
+            --name "$deployment_name" \
+            --location "$LOCATION" \
+            --template-file infra/main.bicep \
+            --parameters environmentName="$ENVIRONMENT_NAME" image="$IMAGE" location="$LOCATION"
+          application_url=$(az deployment sub show \
+            --name "$deployment_name" \
+            --query properties.outputs.applicationUrl.value \
+            --output tsv)
+          readiness_url=$(az deployment sub show \
+            --name "$deployment_name" \
+            --query properties.outputs.readinessUrl.value \
+            --output tsv)
+          echo "application_url=$application_url" >> "$GITHUB_OUTPUT"
+          echo "readiness_url=$readiness_url" >> "$GITHUB_OUTPUT"
+
+      - name: Verify deployed readiness
+        env:
+          READINESS_URL: ${{ steps.deploy.outputs.readiness_url }}
+        run: |
+          for attempt in {1..12}; do
+            if curl --fail --silent --show-error \
+              --connect-timeout 5 \
+              --max-time 10 \
+              "$READINESS_URL"; then
+              exit 0
+            fi
+            echo "Readiness attempt $attempt failed; retrying in 10 seconds."
+            sleep 10
+          done
+          echo "Deployment did not become ready within two minutes." >&2
+          exit 1
+
+      - name: Publish deployment URL
+        env:
+          APPLICATION_URL: ${{ steps.deploy.outputs.application_url }}
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+        run: printf '### %s deployment\n%s\n' "$ENVIRONMENT_NAME" "$APPLICATION_URL" >> "$GITHUB_STEP_SUMMARY"
