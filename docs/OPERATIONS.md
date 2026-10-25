@@ -8,6 +8,18 @@
 
 The current service does not persist user data. A restart reloads the versioned fixtures from the container image.
 
+Application logs are emitted as single-line JSON and include the deployment environment, immutable release reference, request ID, method, path, status, and duration. Query the Container Apps console logs through the deployment's Log Analytics workspace and use request IDs to correlate failures.
+
+The `Production monitor` workflow checks the public service every 15 minutes after the repository variable `PRODUCTION_URL` is configured. Failed checks produce a failed workflow notification, and observations are retained as workflow artifacts for 30 days. Azure telemetry remains the source for request-level error and latency investigation.
+
+## Reliability checks
+
+- `npm run smoke -- https://service.example` verifies liveness, readiness, evaluation summary, request IDs, and security headers.
+- `npm run load:test -- https://service.example` sends a controlled warm workload and fails when errors exceed 1% or p95 latency exceeds 750 ms.
+- Load settings can be changed with `LOAD_REQUESTS`, `LOAD_CONCURRENCY`, `LOAD_MAX_ERROR_RATE`, and `LOAD_MAX_P95_MS`.
+
+The default load check is a release gate, not a capacity benchmark. Record production measurements and operating events in `DEPLOYMENT_LOG.md`. Objectives and evidence requirements are defined in `SLO.md`.
+
 ## CI pipeline
 
 Every push and pull request runs:
@@ -17,7 +29,8 @@ Every push and pull request runs:
 3. Evaluation-report regeneration and drift detection
 4. Production dependency audit
 5. Docker image build
-6. CodeQL analysis on `main`, pull requests, and weekly
+6. High and critical container vulnerability scan
+7. CodeQL analysis on `main`, pull requests, and weekly
 
 The generated evaluation report is retained as a workflow artifact on Node.js 22.
 
@@ -37,6 +50,8 @@ Creating a tag is an external release action. Do it only after CI is green and t
 - [ ] `SECURITY.md` still describes the deployed boundary
 - [ ] Rollback target is identified as the previous container tag
 - [ ] Release notes describe changes and known limits
+- [ ] Staging smoke and load checks pass against the immutable release digest
+- [ ] Production monitoring and rollback records identify the deployed digest
 
 ## Rollback
 

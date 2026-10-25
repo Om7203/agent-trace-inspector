@@ -2,30 +2,55 @@ import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize, sep } from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { evaluateSuite, evaluateTrace } from './evaluator.mjs';
+import { createFixedWindowRateLimiter, rateLimitConfig } from './rate-limit.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const publicRoot = join(root, 'public');
 const traces = JSON.parse(await readFile(join(root, 'data', 'traces.json'), 'utf8'));
 const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 3100);
+const serviceEnvironment = process.env.SERVICE_ENVIRONMENT || 'local';
+const serviceVersion = process.env.SERVICE_VERSION || 'development';
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml' };
+
+function structuredLog(log, level, event, fields = {}) {
+  log(JSON.stringify({
+    timestamp: new Date().toISOString(),
+    level,
+    event,
+    service: 'agent-trace-inspector',
+    environment: serviceEnvironment,
+    version: serviceVersion,
+    ...fields
+  }));
+}
 
 function baseHeaders(requestId) {
   return {
     'x-request-id': requestId,
     'x-content-type-options': 'nosniff',
     'x-frame-options': 'DENY',
+    'cross-origin-opener-policy': 'same-origin',
+    'cross-origin-resource-policy': 'same-origin',
     'referrer-policy': 'no-referrer',
+    'strict-transport-security': 'max-age=31536000',
     'permissions-policy': 'camera=(), microphone=(), geolocation=()',
     'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
   };
 }
 
-function sendJson(response, status, value, requestId) {
-  response.writeHead(status, { ...baseHeaders(requestId), 'content-type': mime['.json'], 'cache-control': 'no-store' });
+function sendJson(response, status, value, requestId, headers = {}) {
+  response.writeHead(status, { ...baseHeaders(requestId), 'content-type': mime['.json'], 'cache-control': 'no-store', ...headers });
   response.end(JSON.stringify(value));
+}
+
+function clientKey(request) {
+  const forwarded = request.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',', 1)[0].trim();
+  return request.socket?.remoteAddress || 'unknown';
 }
 
 async function readBody(request) {
@@ -52,14 +77,23 @@ async function serveStatic(pathname, response, requestId) {
   }
 }
 
-export async function handleRequest(request, response) {
-  const requestId = randomUUID();
+export async function handleRequest(request, response, options = {}) {
+  const requestId = options.requestId || randomUUID();
   const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
   if (request.method === 'GET' && ['/api/health', '/api/health/live'].includes(url.pathname)) return sendJson(response, 200, { status: 'ok', traces: traces.length }, requestId);
   if (request.method === 'GET' && url.pathname === '/api/health/ready') return sendJson(response, 200, { status: 'ready', fixtureSuite: 'loaded', traces: traces.length }, requestId);
   if (request.method === 'GET' && url.pathname === '/api/traces') return sendJson(response, 200, { traces, evaluation: evaluateSuite(traces) }, requestId);
   if (request.method === 'GET' && url.pathname === '/api/summary') return sendJson(response, 200, evaluateSuite(traces), requestId);
   if (request.method === 'POST' && url.pathname === '/api/evaluate') {
+    const rate = options.rateLimiter?.check(clientKey(request));
+    if (rate && !rate.allowed) {
+      return sendJson(response, 429, { error: 'Evaluation request limit exceeded.' }, requestId, {
+        'ratelimit-limit': String(rate.limit),
+        'ratelimit-remaining': String(rate.remaining),
+        'ratelimit-reset': String(Math.ceil(rate.resetAt / 1000)),
+        'retry-after': String(Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1000)))
+      });
+    }
     try {
       return sendJson(response, 200, evaluateTrace(await readBody(request)), requestId);
     } catch (error) {
@@ -70,14 +104,52 @@ export async function handleRequest(request, response) {
   return serveStatic(url.pathname, response, requestId);
 }
 
-export function createApp() {
-  return createServer(handleRequest);
+export function createApp(options = {}) {
+  const log = options.log || console.log;
+  const rateLimiter = options.rateLimiter || createFixedWindowRateLimiter(rateLimitConfig());
+  const server = createServer(async (request, response) => {
+    const requestId = randomUUID();
+    const startedAt = performance.now();
+    const pathname = request.url?.split('?', 1)[0] || '/';
+
+    response.once('finish', () => {
+      structuredLog(log, 'info', 'http_request_completed', {
+        requestId,
+        method: request.method,
+        path: pathname,
+        statusCode: response.statusCode,
+        durationMs: Math.round((performance.now() - startedAt) * 100) / 100
+      });
+    });
+
+    try {
+      await handleRequest(request, response, { rateLimiter, requestId });
+    } catch (error) {
+      structuredLog(log, 'error', 'http_request_failed', {
+        requestId,
+        method: request.method,
+        path: pathname,
+        error: error instanceof Error ? error.message : 'Unknown request error'
+      });
+      if (!response.headersSent) {
+        sendJson(response, 500, { error: 'Internal server error.' }, requestId);
+      } else {
+        response.destroy();
+      }
+    }
+  });
+  server.requestTimeout = 15_000;
+  server.headersTimeout = 10_000;
+  server.keepAliveTimeout = 5_000;
+  return server;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const server = createApp().listen(port, host, () => console.log(`Agent Trace Inspector running at http://${host}:${port}`));
+  const server = createApp().listen(port, host, () => {
+    structuredLog(console.log, 'info', 'service_started', { host, port });
+  });
   const shutdown = signal => {
-    console.log(`${signal} received; closing HTTP server.`);
+    structuredLog(console.log, 'info', 'service_stopping', { signal });
     server.close(error => process.exit(error ? 1 : 0));
     setTimeout(() => process.exit(1), 10_000).unref();
   };

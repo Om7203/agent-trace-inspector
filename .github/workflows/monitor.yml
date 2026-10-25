@@ -1,0 +1,45 @@
+name: Production monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-monitor
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    if: vars.PRODUCTION_URL != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Check the public production service
+        env:
+          TARGET_URL: ${{ vars.PRODUCTION_URL }}
+        run: |
+          set -o pipefail
+          node scripts/smoke-check.mjs "$TARGET_URL" | tee monitor-result.json
+      - name: Retain the observation
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: production-observation-${{ github.run_id }}
+          path: monitor-result.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  configuration-required:
+    if: vars.PRODUCTION_URL == ''
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Set the repository variable PRODUCTION_URL after the first production deployment."
