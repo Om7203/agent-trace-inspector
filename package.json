@@ -8,11 +8,18 @@
     "start": "node src/server.mjs",
     "test": "node --test",
     "evaluate": "node src/report.mjs",
-    "check": "node --check src/evaluator.mjs && node --check src/rate-limit.mjs && node --check src/server.mjs && node --check public/app.js && node --check scripts/smoke-check.mjs && node --check scripts/load-check.mjs && npm test && npm run evaluate",
+    "check": "node --check src/evaluator.mjs && node --check src/rate-limit.mjs && node --check src/server.mjs && node --check src/worker-handler.mjs && node --check src/worker.mjs && node --check public/app.js && node --check scripts/smoke-check.mjs && node --check scripts/load-check.mjs && npm test && npm run evaluate",
+    "deploy:dry-run": "wrangler deploy --dry-run --env staging --outdir .wrangler/dry-run-staging && wrangler deploy --dry-run --env production --outdir .wrangler/dry-run-production",
     "smoke": "node scripts/smoke-check.mjs",
     "load:test": "node scripts/load-check.mjs"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "wrangler": "4.152.0"
+  },
+  "overrides": {
+    "undici": "7.30.1"
   }
 }
