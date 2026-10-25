@@ -44,7 +44,14 @@ function withSecurityHeaders(response, requestId) {
   return secured;
 }
 
-export function createWorkerHandler({ traces, assets, checkRateLimit = async () => null, log = console.log }) {
+export function createWorkerHandler({
+  traces,
+  assets,
+  checkRateLimit = async () => null,
+  log = console.log,
+  serviceEnvironment = 'local',
+  serviceVersion = 'development'
+}) {
   if (!Array.isArray(traces)) throw new TypeError('traces must be an array');
 
   return async function handle(request) {
@@ -91,6 +98,9 @@ export function createWorkerHandler({ traces, assets, checkRateLimit = async () 
         timestamp: new Date().toISOString(),
         level: 'error',
         event: 'http_request_failed',
+        service: 'agent-trace-inspector',
+        environment: serviceEnvironment,
+        version: serviceVersion,
         requestId,
         method: request.method,
         path: url.pathname,
@@ -102,6 +112,9 @@ export function createWorkerHandler({ traces, assets, checkRateLimit = async () 
       timestamp: new Date().toISOString(),
       level: 'info',
       event: 'http_request_completed',
+      service: 'agent-trace-inspector',
+      environment: serviceEnvironment,
+      version: serviceVersion,
       requestId,
       method: request.method,
       path: url.pathname,
