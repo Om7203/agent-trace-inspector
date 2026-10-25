@@ -65,6 +65,8 @@ export function createWorkerHandler({
         response = json({ status: 'ok', traces: traces.length }, 200, requestId);
       } else if (request.method === 'GET' && url.pathname === '/api/health/ready') {
         response = json({ status: 'ready', fixtureSuite: 'loaded', traces: traces.length }, 200, requestId);
+      } else if (request.method === 'GET' && url.pathname === '/api/version') {
+        response = json({ service: 'agent-trace-inspector', environment: serviceEnvironment, version: serviceVersion }, 200, requestId);
       } else if (request.method === 'GET' && url.pathname === '/api/traces') {
         response = json({ traces, evaluation: evaluateSuite(traces) }, 200, requestId);
       } else if (request.method === 'GET' && url.pathname === '/api/summary') {

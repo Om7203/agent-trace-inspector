@@ -82,6 +82,7 @@ export async function handleRequest(request, response, options = {}) {
   const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
   if (request.method === 'GET' && ['/api/health', '/api/health/live'].includes(url.pathname)) return sendJson(response, 200, { status: 'ok', traces: traces.length }, requestId);
   if (request.method === 'GET' && url.pathname === '/api/health/ready') return sendJson(response, 200, { status: 'ready', fixtureSuite: 'loaded', traces: traces.length }, requestId);
+  if (request.method === 'GET' && url.pathname === '/api/version') return sendJson(response, 200, { service: 'agent-trace-inspector', environment: serviceEnvironment, version: serviceVersion }, requestId);
   if (request.method === 'GET' && url.pathname === '/api/traces') return sendJson(response, 200, { traces, evaluation: evaluateSuite(traces) }, requestId);
   if (request.method === 'GET' && url.pathname === '/api/summary') return sendJson(response, 200, evaluateSuite(traces), requestId);
   if (request.method === 'POST' && url.pathname === '/api/evaluate') {
