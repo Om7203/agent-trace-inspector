@@ -17,6 +17,13 @@ const ready = await getJson('/api/health/ready');
 assert.equal(ready.status, 'ready');
 assert.equal(ready.fixtureSuite, 'loaded');
 
+const version = await getJson('/api/version');
+assert.equal(version.service, 'agent-trace-inspector');
+assert.equal(typeof version.environment, 'string');
+assert.ok(version.environment.length > 0);
+assert.equal(typeof version.version, 'string');
+assert.ok(version.version.length > 0);
+
 const summary = await getJson('/api/summary');
 assert.equal(summary.summary.total, ready.traces);
 assert.equal(typeof summary.summary.passRate, 'number');
@@ -25,5 +32,7 @@ console.log(JSON.stringify({
   check: 'smoke',
   status: 'passed',
   target: baseUrl.origin,
-  traces: ready.traces
+  traces: ready.traces,
+  environment: version.environment,
+  version: version.version
 }));

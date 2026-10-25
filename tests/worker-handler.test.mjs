@@ -39,6 +39,18 @@ test('serves static assets through the configured asset binding', async () => {
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
 });
 
+test('reports the deployed Worker identity', async () => {
+  const handle = createHandler({ serviceEnvironment: 'staging', serviceVersion: 'v0.1.0' });
+  const response = await handle(new Request('https://example.test/api/version'));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    service: 'agent-trace-inspector',
+    environment: 'staging',
+    version: 'v0.1.0'
+  });
+});
+
 test('enforces body bounds and a platform rate-limit decision', async () => {
   const limited = createHandler({
     checkRateLimit: async () => ({ allowed: false, limit: 30, remaining: 0, resetAt: Date.now() + 10_000 })

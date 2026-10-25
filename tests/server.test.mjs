@@ -39,6 +39,15 @@ test('reports readiness after loading the fixture suite', async () => {
   assert.deepEqual(readiness.body, { status: 'ready', fixtureSuite: 'loaded', traces: 16 });
 });
 
+test('reports the deployed service identity', async () => {
+  const version = await request('/api/version');
+  assert.deepEqual(version.body, {
+    service: 'agent-trace-inspector',
+    environment: 'local',
+    version: 'development'
+  });
+});
+
 test('emits structured request logs with correlation and timing fields', async () => {
   const lines = [];
   const server = createApp({ log: line => lines.push(line) });
