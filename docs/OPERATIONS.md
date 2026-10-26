@@ -57,6 +57,8 @@ Creating a tag is an external release action. Do it only after CI is green and t
 
 Container releases are immutable by digest. Roll back by deploying the previously verified semantic-version tag. Do not rely on `latest` as a rollback reference.
 
+For the Cloudflare Worker deployment, run `Deploy Cloudflare Worker` from `main`, select `production`, and enter the full SHA of a previous commit from `main` in the optional `revision` input. The workflow rejects revisions that are not ancestors of `origin/main`, runs the normal verification gate, deploys the selected revision, and smoke-tests it. Leave `revision` blank to roll forward to the current `main` revision after the exercise.
+
 ## What remains before a production claim
 
 The repository is designed to be release-ready, not declared production-ready. A public production deployment would still need:
