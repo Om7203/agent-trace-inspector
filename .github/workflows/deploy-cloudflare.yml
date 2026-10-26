@@ -14,6 +14,10 @@ on:
         options:
           - staging
           - production
+      revision:
+        description: Previous main commit SHA to redeploy (blank uses the selected ref)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -29,6 +33,16 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.revision || github.sha }}
+      - name: Validate rollback revision
+        if: github.event_name == 'workflow_dispatch' && inputs.revision != ''
+        env:
+          REVISION: ${{ inputs.revision }}
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$REVISION" origin/main
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
@@ -46,6 +60,8 @@ jobs:
     environment: ${{ github.event_name == 'push' && 'staging' || inputs.environment }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.revision || github.sha }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
