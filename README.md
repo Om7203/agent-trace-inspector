@@ -58,6 +58,7 @@ The evaluator currently performs deterministic structural checks. Evidence-path 
 - `GET /api/health` — process and fixture status
 - `GET /api/health/live` — liveness probe
 - `GET /api/health/ready` — readiness probe
+- `GET /api/version` — deployed service, environment, and release identity
 - `GET /api/traces` — traces plus their evaluation
 - `GET /api/summary` — evaluation report
 - `POST /api/evaluate` — evaluate one trace, limited to 200 KB
@@ -84,6 +85,6 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the data flow and design 
 
 GitHub Actions verifies Node.js 20 and 22, checks the generated report for drift, audits dependencies, builds and scans the container, compiles the Azure infrastructure, exercises smoke and load gates, and runs CodeQL. Semantic-version tags publish an SBOM- and provenance-attested image to GitHub Container Registry.
 
-The Azure deployment path uses Bicep, GitHub OIDC, protected staging and production environments, immutable image digests, Container Apps health probes, Log Analytics, and an external scheduled monitor.
+The public service runs on Cloudflare Workers at [agent-trace-inspector.omvaghasiya2003.workers.dev](https://agent-trace-inspector.omvaghasiya2003.workers.dev). The zero-cost deployment path has separate staging and production environments, distributed Durable Object rate limiting, post-deployment smoke tests, a 15-minute external monitor, and a tested rollback-and-roll-forward procedure. The repository also retains an Azure Container Apps reference architecture for a future container deployment.
 
-This remains a **release-ready learning project**, not a production service, until the real deployment and operating evidence exists. [`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md) is the claim gate. [`docs/OPERATIONS.md`](docs/OPERATIONS.md) covers release and rollback procedures, while [`SECURITY.md`](SECURITY.md) records security boundaries and limitations.
+This is a **production-deployed personal service** with public evidence for CI/CD, security scanning, monitoring, and tested rollback. Its multi-day availability evidence is still accumulating, and it should not be presented as enterprise-scale operating experience. [`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md) records the claim boundary. [`docs/OPERATIONS.md`](docs/OPERATIONS.md) covers release and rollback procedures, while [`SECURITY.md`](SECURITY.md) records security boundaries and limitations.

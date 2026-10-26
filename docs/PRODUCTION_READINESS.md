@@ -17,11 +17,22 @@ Local load results demonstrate that the release gate works. They are not evidenc
 
 ## Requires publication and GitHub evidence
 
-- [ ] All CI jobs pass on the production-deployment changes.
-- [ ] The container builds in GitHub Actions.
-- [ ] Trivy reports no unfixed policy-blocking high or critical vulnerability.
-- [ ] CodeQL passes.
+- [x] All CI jobs pass on the production-deployment changes.
+- [x] The container builds in GitHub Actions.
+- [x] Trivy reports no unfixed policy-blocking high or critical vulnerability.
+- [x] CodeQL passes.
 - [ ] A semantic-version image is published with an SBOM and provenance attestation.
+
+## Cloudflare production deployment
+
+- [x] Staging and production use separate Worker environments.
+- [x] Distributed rate limiting is enforced by a Durable Object.
+- [x] The verified revision deploys to production over HTTPS.
+- [x] Post-deployment smoke checks verify readiness, security headers, traces, environment, and version.
+- [x] `PRODUCTION_URL` is configured and the 15-minute external monitor retains observation artifacts.
+- [x] A guarded rollback accepts only previous commits from `main`.
+- [x] A production rollback and roll-forward were performed and timed.
+- [x] The deployment and rollback log contains real workflow and artifact evidence.
 
 ## Requires an Azure subscription
 
@@ -36,8 +47,8 @@ Local load results demonstrate that the release gate works. They are not evidenc
 
 ## Requires operating evidence
 
-- [ ] A rollback to a previous digest is performed and timed.
-- [ ] The deployment and rollback log contains real evidence links.
+- [x] A rollback to a previous release is performed and timed.
+- [x] The deployment and rollback log contains real evidence links.
 - [ ] Availability, error rate, and latency are observed for at least 14 days.
 - [ ] Any incident during the observation window is recorded with follow-up work.
 - [ ] The measured results meet or explicitly revise the objectives in `SLO.md`.
