@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Om7203/agent-trace-inspector/main/schemas/agent-trace.schema.json",
+  "title": "Agent Trace Inspector trace",
+  "description": "A portable, model-independent record of an agent request, available tools, expected behavior, and observed execution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "category", "provenance", "request", "tools", "expected", "execution"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "provenance": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "request": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 10000
+    },
+    "tools": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/tool" }
+    },
+    "expected": { "$ref": "#/$defs/expected" },
+    "execution": { "$ref": "#/$defs/execution" }
+  },
+  "$defs": {
+    "toolName": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,127}$"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["completed", "refused", "awaiting_approval", "blocked", "failed"]
+    },
+    "jsonValue": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "boolean" },
+        { "type": "number" },
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/jsonValue" }
+        },
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/jsonValue" }
+        }
+      ]
+    },
+    "valueRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["string", "number", "boolean", "array", "object"]
+        },
+        "enum": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/jsonValue" }
+        },
+        "minLength": { "type": "integer", "minimum": 0 },
+        "maxLength": { "type": "integer", "minimum": 0 },
+        "minimum": { "type": "number" },
+        "maximum": { "type": "number" }
+      }
+    },
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "properties", "additionalProperties"],
+      "properties": {
+        "required": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/valueRule" }
+        },
+        "additionalProperties": { "type": "boolean" }
+      }
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "risk", "inputSchema"],
+      "properties": {
+        "name": { "$ref": "#/$defs/toolName" },
+        "risk": {
+          "type": "string",
+          "enum": ["automatic", "confirm"]
+        },
+        "inputSchema": { "$ref": "#/$defs/inputSchema" }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["toolSequence", "outcome"],
+      "properties": {
+        "toolSequence": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "$ref": "#/$defs/toolName" }
+        },
+        "outcome": { "$ref": "#/$defs/outcome" }
+      }
+    },
+    "toolResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "data": { "$ref": "#/$defs/jsonValue" },
+        "error": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "ok": { "const": true } }, "required": ["ok"] },
+          "then": {
+            "properties": { "data": {} },
+            "required": ["data"]
+          }
+        },
+        {
+          "if": { "properties": { "ok": { "const": false } }, "required": ["ok"] },
+          "then": {
+            "properties": { "error": {} },
+            "required": ["error"]
+          }
+        }
+      ]
+    },
+    "call": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "arguments", "executed"],
+      "properties": {
+        "tool": { "$ref": "#/$defs/toolName" },
+        "arguments": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/jsonValue" }
+        },
+        "approvalRequested": { "type": "boolean" },
+        "approved": { "type": "boolean" },
+        "executed": { "type": "boolean" },
+        "result": { "$ref": "#/$defs/toolResult" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "executed": { "const": true } }, "required": ["executed"] },
+          "then": {
+            "properties": { "result": {} },
+            "required": ["result"]
+          }
+        },
+        {
+          "if": { "properties": { "executed": { "const": false } }, "required": ["executed"] },
+          "then": { "not": { "required": ["result"] } }
+        }
+      ]
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "call", "path"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "call": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["calls", "claims", "outcome", "finalResponse"],
+      "properties": {
+        "calls": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "$ref": "#/$defs/call" }
+        },
+        "claims": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": { "$ref": "#/$defs/claim" }
+        },
+        "outcome": { "$ref": "#/$defs/outcome" },
+        "finalResponse": {
+          "type": "string",
+          "maxLength": 50000
+        }
+      }
+    }
+  }
+}

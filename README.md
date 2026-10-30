@@ -15,6 +15,7 @@ Node.js 20 or newer is required. There are no production dependencies.
 ```bash
 npm test
 npm run evaluate
+npm run trace:validate -- data/traces.json
 npm start
 ```
 
@@ -52,6 +53,18 @@ Each trace records:
 - The observed outcome and final response
 
 The evaluator currently performs deterministic structural checks. Evidence-path validation proves only that a referenced value exists; it does not prove that a natural-language claim is entailed by that value.
+
+## Portable trace format
+
+[`schemas/agent-trace.schema.json`](schemas/agent-trace.schema.json) defines the portable trace format using JSON Schema Draft 2020-12. It accepts a single trace or, through the CLI, an array of traces. Categories remain extensible, while tool risk, outcomes, execution state, structured results, and evidence-reference shapes are validated consistently.
+
+Validate an exported trace file with human-readable output:
+
+```bash
+npm run trace:validate -- path/to/traces.json
+```
+
+Use `node src/validate-trace.mjs --json path/to/traces.json` for machine-readable CI output. A valid document exits with code `0`, schema failures exit with code `1`, and file or JSON parsing failures exit with code `2`.
 
 ## API
 
